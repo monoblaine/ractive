@@ -1,3 +1,4 @@
+import runloop from '../../../global/runloop';
 import Item from './Item';
 import resolve from '../../resolvers/resolve';
 
@@ -46,7 +47,10 @@ export default class Mustache extends Item {
 	rebind () {
 		if ( this.isStatic || !this.model ) return;
 
-		const model = resolve( this.parentFragment, this.template );
+		let model = runloop.rebind( this.model );
+		if ( model === 0 ) model = this.model;
+		if ( !model ) model = resolve( this.parentFragment, this.template );
+		//const model = resolve( this.parentFragment, this.template );
 
 		if ( model === this.model ) return;
 

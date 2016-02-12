@@ -6,6 +6,7 @@ import resolve from './resolve';
 import { unbind } from '../../shared/methodCallers';
 import { removeFromArray } from '../../utils/array';
 import { escapeKey } from '../../shared/keypaths';
+import runloop from '../../global/runloop';
 
 export default class ReferenceExpressionProxy extends Model {
 	constructor ( fragment, template ) {
@@ -126,6 +127,27 @@ export default class ReferenceExpressionProxy extends Model {
 
 	handleChange () {
 		this.mark();
+	}
+
+	rebind () {
+		if ( !this.base ) return;
+
+		let base = runloop.rebind( this.base );
+		if ( base && base !== this.base ) {
+			this.base.unregister( this );
+			base.register( this );
+			this.base = base;
+		}
+
+		this.members = this.members.map( m => {
+			if ( !m ) return m;
+			let res = runloop.rebind( m );
+			if ( res && res !== m ) {
+				m.unregister( this );
+				res.register( this );
+			}
+			return res || m;
+		});
 	}
 
 	retrieve () {

@@ -4,6 +4,7 @@ import { handleChange, unbind } from '../../shared/methodCallers';
 import getFunction from '../../shared/getFunction';
 import resolveReference from './resolveReference';
 import { removeFromArray } from '../../utils/array';
+import runloop from '../../global/runloop';
 
 function getValue ( model ) {
 	return model ? model.get( true ) : undefined;
@@ -45,24 +46,9 @@ export default class ExpressionProxy extends Model {
 	bubble () {
 		const ractive = this.fragment.ractive;
 
-		// TODO the @ prevents computed props from shadowing keypaths, but the real
-		// question is why it's a computed prop in the first place... (hint, it's
-		// to do with {{else}} blocks)
-		const key = '@' + this.template.s.replace( /_(\d+)/g, ( match, i ) => {
-			if ( i >= this.models.length ) return match;
-
-			const model = this.models[i];
-			return model ? model.getKeypath() : '@undefined';
-		});
-
+		const key = this.getComputationKey();
 		// TODO can/should we reuse computations?
-		const signature = {
-			getter: () => {
-				const values = this.models.map( getValue );
-				return this.fn.apply( ractive, values );
-			},
-			getterString: key
-		};
+		const signature = this.getSignature( key );
 
 		const computation = ractive.viewmodel.compute( key, signature );
 
@@ -87,6 +73,34 @@ export default class ExpressionProxy extends Model {
 		return this.computation ? this.computation.getKeypath() : '@undefined';
 	}
 
+	getComputationKey () {
+		// TODO the @ prevents computed props from shadowing keypaths, but the real
+		// question is why it's a computed prop in the first place... (hint, it's
+		// to do with {{else}} blocks)
+		return '@' + this.template.s.replace( /_(\d+)/g, ( match, i ) => {
+			if ( i >= this.models.length ) return match;
+
+			const model = this.models[i];
+			return model ? model.getKeypath() : '@undefined';
+		});
+
+	}
+
+	getSignature ( key ) {
+		const signature = {
+			models: this.models.slice(0),
+			fn: this.fn,
+			getterString: key
+		};
+
+		signature.getter = (function () {
+			const values = this.models.map( getValue );
+			return this.fn.apply( this.ractive, values );
+		}).bind( signature );
+
+		return signature;
+	}
+
 	handleChange () {
 		this.deps.forEach( handleChange );
 		this.children.forEach( handleChange );
@@ -108,6 +122,32 @@ export default class ExpressionProxy extends Model {
 
 	mark () {
 		this.handleChange();
+	}
+
+	rebind () {
+		this.models = this.models.map( ( m, index ) => {
+			let next = runloop.rebind( m );
+			if ( next === 0 ) next = m;
+			if ( !next ) next = resolveReference( this.fragment, this.template.r[index] );
+			return next;
+		});
+		let key = this.getComputationKey();
+		let computation = this.root.computations[ key ];
+
+		if ( !computation ) {
+			const signature = this.getSignature( key );
+			computation = this.root.compute( key, signature );
+		}
+		if ( this.computation !== computation ) {
+			this.computation.unregister( this );
+			if ( computation ) {
+				this.computation = computation;
+				computation.register( this );
+				this.value = computation.get();
+				this.handleChange();
+			}
+		}
+		return this;
 	}
 
 	retrieve () {

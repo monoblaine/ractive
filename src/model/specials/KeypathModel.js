@@ -8,6 +8,7 @@ export default class KeypathModel {
 		this.value = ractive ? parent.getKeypath( ractive ) : parent.getKeypath();
 		this.dependants = [];
 		this.children = [];
+		this.isKeypath = true;
 	}
 
 	addChild( model ) {

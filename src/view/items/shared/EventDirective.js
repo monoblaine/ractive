@@ -6,6 +6,7 @@ import { unbind } from '../../../shared/methodCallers';
 import noop from '../../../utils/noop';
 import resolveReference from '../../resolvers/resolveReference';
 import { splitKeypath } from '../../../shared/keypaths';
+import runloop from '../../../global/runloop';
 
 const eventPattern = /^event(?:\.(.+))?$/;
 const argumentsPattern = /^arguments\.(\d*)$/;
@@ -210,8 +211,14 @@ export default class EventDirective {
 	}
 
 	rebind () {
-		this.unbind();
-		this.bind();
+	   this.context = this.parentFragment.findContext();
+		if ( this.models ) {
+			this.models = this.models.map( m => {
+				return runloop.rebind( m ) || m;
+			});
+		}
+		if ( this.action && this.action.rebind ) this.action.rebind();
+		if ( this.args && this.args.rebind ) this.args.rebind();
 	}
 
 	render () {

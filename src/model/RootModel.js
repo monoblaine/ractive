@@ -38,7 +38,7 @@ export default class RootModel extends Model {
 	}
 
 	compute ( key, signature ) {
-		const computation = new Computation( this, signature, key );
+		const computation = this.computations[ key ] || new Computation( this, signature, key );
 		this.computations[ key ] = computation;
 
 		return computation;

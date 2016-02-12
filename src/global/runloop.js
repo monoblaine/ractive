@@ -5,7 +5,7 @@ import TransitionManager from './TransitionManager';
 
 const changeHook = new Hook( 'change' );
 
-let batch;
+let batch, arr = [];
 
 const runloop = {
 	start ( instance, returnPromise ) {
@@ -26,6 +26,38 @@ const runloop = {
 		};
 
 		return promise;
+	},
+
+	current () {
+		return batch;
+	},
+
+	rebind ( model ) {
+		if ( !batch.shuffling || !model || model.isKey ) return false;
+		const rebind = batch.shuffling;
+
+		if ( model.rebind ) return model.rebind();
+
+		let path = model.isKeypath ? model.parent.getKeypath() : model.getKeypath();
+		if ( typeof path !== 'string' || path.indexOf( rebind.path + '.' ) !== 0 || path === rebind.path + '.length' ) return false;
+
+		let current = model.isKeypath ? model.parent : model;
+		arr.length = 0;
+		while ( current.getKeypath() !== rebind.path ) {
+			arr.unshift( current.key );
+			current = current.parent;
+		}
+
+		let idx = arr.shift(), nidx = rebind.indices[ idx ];
+		if ( idx == nidx ) return 0;
+		else if ( nidx == -1 ) nidx = idx;
+
+		if ( nidx !== undefined ) {
+			arr.unshift( nidx );
+			current = current.joinAll( arr );
+			if ( model.isKeypath ) return current.getKeypathModel( model.ractive );
+			else return current;
+		}
 	},
 
 	end () {

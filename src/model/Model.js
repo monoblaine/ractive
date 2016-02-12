@@ -9,6 +9,7 @@ import { isArray, isObject } from '../utils/is';
 import KeyModel from './specials/KeyModel';
 import KeypathModel from './specials/KeypathModel';
 import { escapeKey, unescapeKey } from '../shared/keypaths';
+import runloop from '../global/runloop';
 
 const hasProp = Object.prototype.hasOwnProperty;
 
@@ -260,8 +261,10 @@ export default class Model {
 	}
 
 	getKeypath ( ractive ) {
-		let root = this.parent.isRoot ? escapeKey( this.key ) : this.parent.getKeypath() + '.' + escapeKey( this.key );
+		if ( !this.keypath ) this.keypath = this.parent.isRoot ? escapeKey( this.key ) : this.parent.getKeypath() + '.' + escapeKey( this.key );
+		if ( !ractive ) return this.keypath;
 
+		let root = this.keypath;
 		if ( ractive && ractive.component ) {
 			let map = ractive.viewmodel.mappings;
 			for ( let k in map ) {
@@ -410,23 +413,7 @@ export default class Model {
 	}
 
 	shuffle ( newIndices ) {
-		const indexModels = [];
-
-		newIndices.forEach( ( newIndex, oldIndex ) => {
-			if ( !~newIndex ) return;
-
-			const model = this.indexModels[ oldIndex ];
-
-			if ( !model ) return;
-
-			indexModels[ newIndex ] = model;
-
-			if ( newIndex !== oldIndex ) {
-				model.rebind( newIndex );
-			}
-		});
-
-		this.indexModels = indexModels;
+		runloop.current().shuffling = { path: this.getKeypath(), indices: newIndices };
 
 		// shuffles need to happen before marks...
 		this.deps.forEach( dep => {

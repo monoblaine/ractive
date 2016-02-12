@@ -6,6 +6,7 @@ export default class KeyModel {
 		this.value = key;
 		this.isReadonly = true;
 		this.dependants = [];
+		this.isKey = true;
 	}
 
 	get () {

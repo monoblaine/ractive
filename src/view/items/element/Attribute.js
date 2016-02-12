@@ -78,8 +78,7 @@ export default class Attribute extends Item {
 	}
 
 	rebind () {
-		this.unbind();
-		this.bind();
+		this.fragment && this.fragment.rebind();
 	}
 
 	render () {
