@@ -1,31 +1,35 @@
-import runloop from '../../../../global/runloop';
 import { defineProperty } from '../../../../utils/object';
-import getNewIndices from '../../../../shared/getNewIndices';
-import processWrapper from './processWrapper';
 
 const mutatorMethods = [ 'pop', 'push', 'reverse', 'shift', 'sort', 'splice', 'unshift' ];
 let patchedArrayProto = [];
 
 mutatorMethods.forEach( methodName => {
 	const method = function ( ...args ) {
-		const newIndices = getNewIndices( this.length, methodName, args );
+		const meta = this._ractive;
 
-		// apply the underlying method
-		const result = Array.prototype[ methodName ].apply( this, arguments );
-
-		// trigger changes
-		runloop.start();
-
-		this._ractive.setting = true;
-		let i = this._ractive.wrappers.length;
-		while ( i-- ) {
-			processWrapper( this._ractive.wrappers[i], this, methodName, newIndices );
+		if ( meta.setting ) {
+			return Array.prototype[ methodName ].apply( this, arguments );
 		}
 
-		runloop.end();
+		meta.setting = true;
 
-		this._ractive.setting = false;
-		return result;
+		const first = meta.wrappers[0];
+
+		// first one gets a shuffle
+		args.unshift( first.keypath );
+		const result = first.root[ methodName ].apply( first.root, args );
+
+		// everyone else gets an update
+		let i = meta.wrappers.length - 1;
+		while ( i ) {
+			const wrapper = meta.wrappers[i];
+			wrapper.root.update( wrapper.keypath );
+			i--;
+		}
+
+		meta.setting = false;
+
+		return result.result;
 	};
 
 	defineProperty( patchedArrayProto, methodName, {

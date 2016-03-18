@@ -2,8 +2,6 @@ import { defineProperty } from '../../../../utils/object';
 import { isArray } from '../../../../utils/is';
 import patch from './patch';
 
-const errorMessage = 'Something went wrong in a rather interesting way';
-
 export default {
 	filter ( object ) {
 		// wrap the array if a) b) it's an array, and b) either it hasn't been wrapped already,
@@ -16,10 +14,10 @@ export default {
 };
 
 class ArrayWrapper {
-	constructor ( ractive, array ) {
+	constructor ( ractive, array, keypath ) {
 		this.root = ractive;
 		this.value = array;
-		this.__model = null; // filled in later
+		this.keypath = keypath;
 
 		// if this array hasn't already been ractified, ractify it
 		if ( !array._ractive ) {
@@ -27,7 +25,6 @@ class ArrayWrapper {
 			defineProperty( array, '_ractive', {
 				value: {
 					wrappers: [],
-					instances: [],
 					setting: false
 				},
 				configurable: true
@@ -36,13 +33,6 @@ class ArrayWrapper {
 			patch( array );
 		}
 
-		// store the ractive instance, so we can handle transitions later
-		if ( !array._ractive.instances[ ractive._guid ] ) {
-			array._ractive.instances[ ractive._guid ] = 0;
-			array._ractive.instances.push( ractive );
-		}
-
-		array._ractive.instances[ ractive._guid ] += 1;
 		array._ractive.wrappers.push( this );
 	}
 
@@ -51,46 +41,25 @@ class ArrayWrapper {
 	}
 
 	teardown () {
-		var array, storage, wrappers, instances, index;
-
-		array = this.value;
-		storage = array._ractive;
-		wrappers = storage.wrappers;
-		instances = storage.instances;
+		const array = this.value;
+		const meta = array._ractive;
 
 		// if teardown() was invoked because we're clearing the cache as a result of
 		// a change that the array itself triggered, we can save ourselves the teardown
 		// and immediate setup
-		if ( storage.setting ) {
+		if ( meta.setting ) {
 			return false; // so that we don't remove it from cached wrappers
 		}
 
-		index = wrappers.indexOf( this );
-		if ( index === -1 ) {
-			throw new Error( errorMessage );
-		}
-
-		wrappers.splice( index, 1 );
+		meta.wrappers.splice( meta.wrappers.indexOf( this, 1 ) );
 
 		// if nothing else depends on this array, we can revert it to its
 		// natural state
-		if ( !wrappers.length ) {
+		if ( !meta.wrappers.length ) {
 			delete array._ractive;
-			patch.unpatch( this.value );
+			patch.unpatch( array );
 		}
 
-		else {
-			// remove ractive instance if possible
-			instances[ this.root._guid ] -= 1;
-			if ( !instances[ this.root._guid ] ) {
-				index = instances.indexOf( this.root );
-
-				if ( index === -1 ) {
-					throw new Error( errorMessage );
-				}
-
-				instances.splice( index, 1 );
-			}
-		}
+		return true;
 	}
 }
