@@ -128,7 +128,7 @@ export default class Model {
 			this.parent.value = this.parent.wrapper.get();
 
 			this.value = this.parent.value[ this.key ];
-			// TODO should this value be adapted? probably
+			this.adapt();
 		} else if ( this.wrapper ) {
 			const shouldTeardown = !this.wrapper.reset || this.wrapper.reset( value ) === false;
 
@@ -443,6 +443,20 @@ export default class Model {
 		this.deps.forEach( dep => {
 			if ( !dep.shuffle ) dep.handleChange();
 		});
+
+		this.shuffled();
+	}
+
+	shuffled () {
+		if ( this.wrapper ) {
+			this.wrapper.teardown();
+			this.adapt();
+		}
+
+		let i = this.children.length;
+		while ( i-- ) {
+			if ( this.children[i].shuffled ) this.children[i].shuffled();
+		}
 	}
 
 	teardown () {

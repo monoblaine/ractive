@@ -87,8 +87,6 @@ class MagicWrapper {
 
 			const descriptor = createOrWrapDescriptor( originalDescriptor, ractive, childKeypath );
 
-
-
 			Object.defineProperty( this.value, key, descriptor );
 		});
 	}

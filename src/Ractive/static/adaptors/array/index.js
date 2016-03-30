@@ -44,12 +44,8 @@ class ArrayWrapper {
 		const array = this.value;
 		const meta = array._ractive;
 
-		// if teardown() was invoked because we're clearing the cache as a result of
-		// a change that the array itself triggered, we can save ourselves the teardown
-		// and immediate setup
-		if ( meta.setting ) {
-			return false; // so that we don't remove it from cached wrappers
-		}
+		// apparently already torn down, so nothing to do
+		if ( !meta ) return;
 
 		meta.wrappers.splice( meta.wrappers.indexOf( this, 1 ) );
 
@@ -59,7 +55,5 @@ class ArrayWrapper {
 			delete array._ractive;
 			patch.unpatch( array );
 		}
-
-		return true;
 	}
 }

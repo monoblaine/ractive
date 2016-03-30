@@ -21,7 +21,7 @@ mutatorMethods.forEach( methodName => {
 
 		// everyone else gets an update
 		let i = meta.wrappers.length - 1;
-		while ( i ) {
+		while ( i > 0 ) {
 			const wrapper = meta.wrappers[i];
 			wrapper.root.update( wrapper.keypath );
 			i--;
