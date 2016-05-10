@@ -63,17 +63,20 @@ export default function getUpdateDelegate ( attribute ) {
 	return updateAttribute;
 }
 
-function updateId () {
+function updateId ( reset ) {
 	const { node } = this;
 	const value = this.getValue();
 
-	delete this.ractive.nodes[ node.id ];
+	// remove the mapping to this node if it hasn't already been replaced
+	if ( this.ractive.nodes[ node.id ] === node ) delete this.ractive.nodes[ node.id ];
+	if ( reset ) return node.removeAttribute( 'id' );
+
 	this.ractive.nodes[ value ] = node;
 
 	node.id = value;
 }
 
-function updateMultipleSelectValue () {
+function updateMultipleSelectValue ( reset ) {
 	let value = this.getValue();
 
 	if ( !isArray( value ) ) value = [ value ];
@@ -81,17 +84,21 @@ function updateMultipleSelectValue () {
 	const options = this.node.options;
 	let i = options.length;
 
-	while ( i-- ) {
-		const option = options[i];
-		const optionValue = option._ractive ?
-			option._ractive.value :
-			option.value; // options inserted via a triple don't have _ractive
+	if ( reset ) {
+		while ( i-- ) options[i].selected = false;
+	} else {
+		while ( i-- ) {
+			const option = options[i];
+			const optionValue = option._ractive ?
+				option._ractive.value :
+				option.value; // options inserted via a triple don't have _ractive
 
-		option.selected = arrayContains( value, optionValue );
+			option.selected = arrayContains( value, optionValue );
+		}
 	}
 }
 
-function updateSelectValue () {
+function updateSelectValue ( reset ) {
 	const value = this.getValue();
 
 	if ( !this.locked ) { // TODO is locked still a thing?
@@ -99,37 +106,46 @@ function updateSelectValue () {
 
 		const options = this.node.options;
 		let i = options.length;
+		let wasSelected = false;
 
-		while ( i-- ) {
-			const option = options[i];
-			const optionValue = option._ractive ?
-				option._ractive.value :
-				option.value; // options inserted via a triple don't have _ractive
+		if ( reset ) {
+			while ( i-- ) options[i].selected = false;
+		} else {
+			while ( i-- ) {
+				const option = options[i];
+				const optionValue = option._ractive ?
+					option._ractive.value :
+					option.value; // options inserted via a triple don't have _ractive
+				if ( option.disabled && option.selected ) wasSelected = true;
 
-			if ( optionValue == value ) { // double equals as we may be comparing numbers with strings
-				option.selected = true;
-				return;
+				if ( optionValue == value ) { // double equals as we may be comparing numbers with strings
+					option.selected = true;
+					return;
+				}
 			}
 		}
 
-		this.node.selectedIndex = -1;
+		if ( !wasSelected ) this.node.selectedIndex = -1;
 	}
 }
 
 
-function updateContentEditableValue () {
+function updateContentEditableValue ( reset ) {
 	const value = this.getValue();
 
 	if ( !this.locked ) {
-		this.node.innerHTML = value === undefined ? '' : value;
+		if ( reset ) this.node.innerHTML = '';
+		else this.node.innerHTML = value === undefined ? '' : value;
 	}
 }
 
-function updateRadioValue () {
+function updateRadioValue ( reset ) {
 	const node = this.node;
 	const wasChecked = node.checked;
 
 	const value = this.getValue();
+
+	if ( reset ) return node.checked = false;
 
 	//node.value = this.element.getAttribute( 'value' );
 	node.value = this.node._ractive.value = value;
@@ -144,8 +160,14 @@ function updateRadioValue () {
 	}
 }
 
-function updateValue () {
+function updateValue ( reset ) {
 	if ( !this.locked ) {
+		if ( reset ) {
+			this.node.removeAttribute( 'value' );
+			this.node.value = this.node._ractive.value = null;
+			return;
+		}
+
 		const value = this.getValue();
 
 		this.node.value = this.node._ractive.value = value;
@@ -153,8 +175,14 @@ function updateValue () {
 	}
 }
 
-function updateStringValue () {
+function updateStringValue ( reset ) {
 	if ( !this.locked ) {
+		if ( reset ) {
+			this.node._ractive.value = '';
+			this.node.removeAttribute( 'value' );
+			return;
+		}
+
 		const value = this.getValue();
 
 		this.node._ractive.value = value;
@@ -164,16 +192,21 @@ function updateStringValue () {
 	}
 }
 
-function updateRadioName () {
-	this.node.checked = ( this.getValue() == this.node._ractive.value );
+function updateRadioName ( reset ) {
+	if ( reset ) this.node.checked = false;
+	else this.node.checked = ( this.getValue() == this.node._ractive.value );
 }
 
-function updateCheckboxName () {
+function updateCheckboxName ( reset ) {
 	const { element, node } = this;
 	const binding = element.binding;
 
 	const value = this.getValue();
 	const valueAttribute = element.getAttribute( 'value' );
+
+	if ( reset ) {
+		// TODO: WAT?
+	}
 
 	if ( !isArray( value ) ) {
 		binding.isChecked = node.checked = ( value == valueAttribute );
@@ -189,8 +222,8 @@ function updateCheckboxName () {
 	}
 }
 
-function updateStyleAttribute () {
-	const props = readStyle( this.getValue() || '' );
+function updateStyleAttribute ( reset ) {
+	const props = reset ? {} : readStyle( this.getValue() || '' );
 	const style = this.node.style;
 	const keys = Object.keys( props );
 	const prev = this.previous || [];
@@ -211,16 +244,16 @@ function updateStyleAttribute () {
 }
 
 const camelize = /(-.)/g;
-function updateInlineStyle () {
+function updateInlineStyle ( reset ) {
 	if ( !this.styleName ) {
 		this.styleName = this.name.substr( 6 ).replace( camelize, s => s.charAt( 1 ).toUpperCase() );
 	}
 
-	this.node.style[ this.styleName ] = this.getValue();
+	this.node.style[ this.styleName ] = reset ? '' : this.getValue();
 }
 
-function updateClassName () {
-	const value = readClass( safeToStringValue( this.getValue() ) );
+function updateClassName ( reset ) {
+	const value = reset ? [] : readClass( safeToStringValue( this.getValue() ) );
 	const attr = readClass( this.node.className );
 	const prev = this.previous || [];
 
@@ -244,10 +277,10 @@ function updateClassName () {
 	this.previous = value;
 }
 
-function updateInlineClass () {
+function updateInlineClass ( reset ) {
 	const name = this.name.substr( 6 );
 	const attr = readClass( this.node.className );
-	const value = this.getValue();
+	const value = reset ? false : this.getValue();
 
 	if ( value && !~attr.indexOf( name ) ) attr.push( name );
 	else if ( !value && ~attr.indexOf( name ) ) attr.splice( attr.indexOf( name ), 1 );
@@ -255,10 +288,16 @@ function updateInlineClass () {
 	this.node.className = attr.join( ' ' );
 }
 
-function updateBoolean () {
+function updateBoolean ( reset ) {
 	// with two-way binding, only update if the change wasn't initiated by the user
 	// otherwise the cursor will often be sent to the wrong place
 	if ( !this.locked ) {
+		if ( reset ) {
+			if ( this.useProperty ) this.node[ this.propertyName ] = false;
+			this.node.removeAttribute( this.propertyName );
+			return;
+		}
+
 		if ( this.useProperty ) {
 			this.node[ this.propertyName ] = this.getValue();
 		} else {
@@ -271,10 +310,12 @@ function updateBoolean () {
 	}
 }
 
-function updateAttribute () {
-	this.node.setAttribute( this.name, safeToStringValue( this.getString() ) );
+function updateAttribute ( reset ) {
+	if ( reset ) this.node.removeAttribute( this.name );
+	else this.node.setAttribute( this.name, safeToStringValue( this.getString() ) );
 }
 
-function updateNamespacedAttribute () {
-	this.node.setAttributeNS( this.namespace, this.name.slice( this.name.indexOf( ':' ) + 1 ), safeToStringValue( this.getString() ) );
+function updateNamespacedAttribute ( reset ) {
+	if ( reset ) this.node.removeAttributeNS( this.namespace, this.name.slice( this.name.indexOf( ':' ) + 1 ) );
+	else this.node.setAttributeNS( this.namespace, this.name.slice( this.name.indexOf( ':' ) + 1 ), safeToStringValue( this.getString() ) );
 }

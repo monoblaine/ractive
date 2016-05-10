@@ -2,6 +2,7 @@ import { INTERPOLATOR } from '../../../config/types';
 import namespaces from '../../../config/namespaces';
 import Fragment from '../../Fragment';
 import Item from '../shared/Item';
+import findElement from '../shared/findElement';
 import getUpdateDelegate from './attribute/getUpdateDelegate';
 import propertyNames from './attribute/propertyNames';
 import { isArray } from '../../../utils/is';
@@ -23,33 +24,36 @@ export default class Attribute extends Item {
 	constructor ( options ) {
 		super( options );
 
-		this.name = options.name;
+		this.name = options.template.n;
 		this.namespace = null;
-		this.element = options.element;
-		this.parentFragment = options.element.parentFragment; // shared
+
+		this.owner = options.owner || options.parentFragment.owner || options.element || findElement( options.parentFragment );
+		this.element = options.element || (this.owner.attributeByName ? this.owner : findElement( options.parentFragment ) );
+		this.parentFragment = this.element.parentFragment; // shared
 		this.ractive = this.parentFragment.ractive;
 
 		this.rendered = false;
 		this.updateDelegate = null;
 		this.fragment = null;
-		this.value = null;
 
-		if ( !isArray( options.template ) ) {
-			this.value = options.template;
+		this.element.attributeByName[ this.name ] = this;
+
+		if ( !isArray( options.template.f ) ) {
+			this.value = options.template.f;
 			if ( this.value === 0 ) {
 				this.value = '';
 			}
 		} else {
 			this.fragment = new Fragment({
 				owner: this,
-				template: options.template
+				template: options.template.f
 			});
 		}
 
 		this.interpolator = this.fragment &&
-		                    this.fragment.items.length === 1 &&
-		                    this.fragment.items[0].type === INTERPOLATOR &&
-		                    this.fragment.items[0];
+			this.fragment.items.length === 1 &&
+			this.fragment.items[0].type === INTERPOLATOR &&
+			this.fragment.items[0];
 	}
 
 	bind () {
@@ -78,7 +82,7 @@ export default class Attribute extends Item {
 	}
 
 	rebind () {
-		if (this.fragment) this.fragment.rebind();
+		if ( this.fragment ) this.fragment.rebind();
 	}
 
 	render () {
@@ -146,12 +150,20 @@ export default class Attribute extends Item {
 
 	unbind () {
 		if ( this.fragment ) this.fragment.unbind();
+		if ( this.boundFragment ) this.boundFragment.unbind();
+	}
+
+	unrender () {
+		this.updateDelegate( true );
+
+		this.rendered = false;
 	}
 
 	update () {
 		if ( this.dirty ) {
 			this.dirty = false;
 			if ( this.fragment ) this.fragment.update();
+			if ( this.boundFragment ) this.boundFragment.update();
 			if ( this.rendered ) this.updateDelegate();
 		}
 	}
