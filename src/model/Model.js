@@ -80,7 +80,8 @@ export default class Model {
 
 				// don't branch for undefined values
 				if ( this.value !== undefined ) {
-					const parentValue = this.parent.value || this.parent.createBranch( this.key );
+					// TODO: checking for a computation like this is a temporary hack... fix it
+					const parentValue = ( keypath[0] === '#' ? this.parent.get() : this.parent.value ) || this.parent.createBranch( this.key );
 					if ( parentValue[ this.key ] !== this.value ) parentValue[ this.key ] = value;
 				}
 			} else {
