@@ -3,6 +3,7 @@ export default {
   el: void 0,
   append: false,
   delegate: true,
+  enhance: false,
 
   // template:
   template: null,
